@@ -83,30 +83,40 @@ def load_file(files, filetype='csv'):
         f.close()
     #根据生成的字典生成矩阵
     X = v.fit_transform(X.T[0])
-    labels = set(y)
+    labels = set(y.reshape(np.shape(y)[0], ))
     labelsmap = {j: i for i, j in enumerate(labels)}
     for i in labels:
         y[y[:, :]==i] = labelsmap[i]
     return X, y, v.get_feature_names(), labels
 
 #----------------------------------------------------------------------
-def select_features_chi(dirs, nums=1000, filetype='csv'):
+def select_features_chi(dirs, nums=5000, filetype='csv'):
     """
     使用卡方检验选取特征值
     """
     cwd = os.getcwd()
     cwd = cwd + '\\' + dirs
     files = get_test_files(cwd)
-    X, y, labels = load_file(files, filetype)
+    X, y, features, labels = load_file(files, filetype)
+    m, n = np.shape(X)
+    print u'总样本数：', m
+    trainlines = []
+    testlines = []
+    for i in range(m):
+        if random.random() < 0.9:
+            trainlines.append(i)
+        else:
+            testlines.append(i)
     #计算卡方
-    chi2s = chi2(X, y)[0]
-    dicts = dict(zip(range(np.shape(chi2s)[0]), chi2s))
-    sortedlist = sorted(dicts.iteritems(), 
-                        key=lambda i: i[1], 
-                        reverse=True)
-    columns = [i for (i, _) in sortedlist]
+    chi2s = chi2(X[trainlines, :], y[trainlines, :])[0]
+    #dicts = dict(zip(range(np.shape(chi2s)[0]), chi2s))
+    #sortedlist = sorted(dicts.iteritems(), 
+                        #key=lambda i: i[1], 
+                        #reverse=True)
+    #columns = [i for (i, _) in sortedlist]
+    columns = np.argsort(chi2s)[::-1]
     return X[:, columns[:nums]], y, \
-           [labels[int(i)] for i in np.array(sortedlist[:nums])[:, 0]]
+           [features[i] for i in columns], trainlines, testlines
 
 ##----------------------------------------------------------------------
 #def select_features_ig(dirs, nums=1000, filetype='csv'):
@@ -146,7 +156,7 @@ def select_features_mul(dirs, nums=1000, filetype='csv'):
     cwd = os.getcwd()
     cwd = cwd + '\\' + dirs
     files = get_test_files(cwd)
-    X, y, labels = load_file(files, filetype)
+    X, y, features, labels = load_file(files, filetype)
     m, n = np.shape(X)
     #计算信息熵增益
     newX = X.copy()
@@ -159,7 +169,7 @@ def select_features_mul(dirs, nums=1000, filetype='csv'):
                         reverse=True)
     columns = [i for (i, _) in sortedlist]
     return X[:, columns[:nums]], y, \
-           [labels[int(i)] for i in np.array(sortedlist[:nums])[:, 0]]
+           [features[int(i)] for i in np.array(sortedlist[:nums])[:, 0]]
     
 
 #----------------------------------------------------------------------
@@ -227,17 +237,8 @@ class BayesTextClsTest(unittest.TestCase):
         #import pdb
         #pdb.set_trace()
         start = datetime.datetime.now()
-        #X, y, labels = select_features_chi('test_file2', filetype='txt')
-        X, y, labels = select_features_mul('test_file2', filetype='txt')
-        m = np.shape(X)[0]
-        print u'总样本数：', m
-        train_lines = []
-        test_lines = []
-        for i in range(m):
-            if random.random() <= 0.7:
-                train_lines.append(i)
-            else:
-                test_lines.append(i)
+        X, y, features, train_lines, test_lines = select_features_chi('test_file1', filetype='csv')
+        #X, y, labels = select_features_mul('test_file2', filetype='txt')
         train_X = X[train_lines, :]
         train_y = y[train_lines, :]
         test_X = X[test_lines, :]
